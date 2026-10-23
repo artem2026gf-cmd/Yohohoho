@@ -1,0 +1,705 @@
+local G=getgenv and getgenv() or _G
+for _,k in ipairs({"AuroraHubV3","AuroraHubV4"}) do
+local o=G[k]
+if o then
+if o.Stop then pcall(function()o:Stop()end)end
+if o.Window then pcall(function()o.Window:Destroy()end)end
+end
+G[k]=nil
+end
+
+local P=game:GetService("Players")
+local W=game:GetService("Workspace")
+local R=game:GetService("RunService")
+local LP=P.LocalPlayer
+local PG=LP:WaitForChild("PlayerGui")
+
+for _,v in ipairs(PG:GetChildren())do
+if v.Name=="AuroraVisualRenderV4" or v.Name=="AuroraHubVisualsV3" then v:Destroy()end
+end
+
+local A={
+Active=true,Ready=false,Connections={},
+Boxes={},Bars={},Registry={},
+C={enabled=false,mode="corners",glow=false,glowTransparency=.9,filled=false,filledTransparency=.45,outline=false,outlineTransparency=.8},
+HC={enabled=false,number=true,glow=false,outline=true,width=4,gap=7,speed=12}
+}
+G.AuroraHubV4=A
+
+local function color(r,g,b)return Color3.fromRGB(r,g,b)end
+local ice=color(125,100,235)
+local lavender=color(195,175,255)
+local blue=color(165,225,255)
+local dark=color(14,10,25)
+
+local function gradient(parent,colors,rotation)
+local g=Instance.new("UIGradient")
+g.Color=ColorSequence.new(colors)
+g.Rotation=rotation or 0
+g.Parent=parent
+return g
+end
+
+local iceColors={
+ColorSequenceKeypoint.new(0,ice),
+ColorSequenceKeypoint.new(.5,lavender),
+ColorSequenceKeypoint.new(1,blue)
+}
+
+local hpColors={
+ColorSequenceKeypoint.new(0,color(45,255,105)),
+ColorSequenceKeypoint.new(.5,color(255,235,65)),
+ColorSequenceKeypoint.new(1,color(255,55,75))
+}
+
+local gui=Instance.new("ScreenGui")
+gui.Name="AuroraVisualRenderV4"
+gui.IgnoreGuiInset=true
+gui.ResetOnSpawn=false
+gui.DisplayOrder=9999
+gui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling
+gui.Parent=PG
+A.VisualGui=gui
+
+local function frame(parent,z)
+local f=Instance.new("Frame")
+f.BackgroundColor3=Color3.new(1,1,1)
+f.BorderSizePixel=0
+f.ZIndex=z or 2
+f.Parent=parent
+return f
+end
+
+local function rect(f,x,y,w,h)
+f.Position=UDim2.fromOffset(x,y)
+f.Size=UDim2.fromOffset(w,h)
+end
+
+local function stroke(parent,thickness,trans,col)
+local s=Instance.new("UIStroke")
+s.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
+s.Thickness=thickness
+s.Transparency=trans or 0
+s.Color=col or dark
+s.Parent=parent
+return s
+end
+
+local function glow(parent,z)
+local g=Instance.new("ImageLabel")
+g.BackgroundTransparency=1
+g.Image="rbxassetid://18245826428"
+g.ImageColor3=lavender
+g.ImageTransparency=.9
+g.ScaleType=Enum.ScaleType.Slice
+g.SliceCenter=Rect.new(21,21,79,79)
+g.ZIndex=z
+g.Parent=parent
+return g
+end
+
+local function newBox()
+local holder=frame(gui,2)
+holder.BackgroundTransparency=1
+holder.Visible=false
+
+local e={holder=holder,parts={}}
+e.glow=glow(holder,1)
+
+e.fill=frame(holder,2)
+gradient(e.fill,iceColors,90)
+
+e.full=frame(holder,4)
+e.full.BackgroundTransparency=1
+e.fullStroke=stroke(e.full,2,0,lavender)
+gradient(e.fullStroke,iceColors,0)
+
+for i=1,8 do
+local back=frame(holder,3)
+back.BackgroundColor3=dark
+local front=frame(holder,4)
+gradient(front,iceColors,i<=4 and 0 or 90)
+e.parts[i]={back,front}
+end
+
+return e
+end
+
+local function drawBox(e,x,y,w,h)
+local C=A.C
+local p=e.parts
+local length=math.max(4,math.floor(math.min(w,h)*.25+.5))
+local t=2
+local positions={
+{0,0,length,t},
+{w-length,0,length,t},
+{0,h-t,length,t},
+{w-length,h-t,length,t},
+{0,0,t,length},
+{w-t,0,t,length},
+{0,h-length,t,length},
+{w-t,h-length,t,length}
+}
+
+rect(e.holder,x,y,w,h)
+e.holder.Visible=true
+
+e.fill.Visible=C.filled
+e.fill.BackgroundTransparency=C.filledTransparency
+rect(e.fill,0,0,w,h)
+
+e.glow.Visible=C.glow
+e.glow.ImageTransparency=C.glowTransparency
+rect(e.glow,-13,-13,w+26,h+26)
+
+local full=C.mode=="full"
+e.full.Visible=full
+rect(e.full,0,0,w,h)
+e.fullStroke.Transparency=0
+e.fullStroke.Thickness=2
+
+for i,v in ipairs(p)do
+local q=positions[i]
+local back,front=v[1],v[2]
+back.Visible=not full and C.outline
+front.Visible=not full
+if not full then
+rect(front,q[1],q[2],q[3],q[4])
+rect(back,q[1]-1,q[2]-1,q[3]+2,q[4]+2)
+back.BackgroundTransparency=C.outlineTransparency
+end
+end
+
+if full and C.outline then
+if not e.fullOutline then
+e.fullOutline=frame(e.holder,3)
+e.fullOutline.BackgroundTransparency=1
+e.fullOutlineStroke=stroke(e.fullOutline,4,.8,dark)
+end
+e.fullOutline.Visible=true
+rect(e.fullOutline,0,0,w,h)
+e.fullOutlineStroke.Transparency=C.outlineTransparency
+else
+if e.fullOutline then e.fullOutline.Visible=false end
+end
+end
+
+local function newBar()
+local holder=frame(gui,5)
+holder.BackgroundTransparency=1
+holder.Visible=false
+
+local e={holder=holder,smooth=1}
+e.glow=glow(holder,4)
+
+e.back=frame(holder,5)
+e.back.BackgroundColor3=dark
+
+e.outline=stroke(e.back,1,0,dark)
+
+e.clip=frame(e.back,6)
+e.clip.BackgroundTransparency=1
+e.clip.ClipsDescendants=true
+
+e.fill=frame(e.clip,6)
+gradient(e.fill,hpColors,90)
+
+e.text=Instance.new("TextLabel")
+e.text.BackgroundTransparency=1
+e.text.TextColor3=Color3.new(1,1,1)
+e.text.TextStrokeTransparency=.35
+e.text.Font=Enum.Font.GothamBold
+e.text.TextSize=12
+e.text.TextXAlignment=Enum.TextXAlignment.Center
+e.text.ZIndex=8
+e.text.Parent=holder
+
+return e
+end
+
+local function drawBar(e,x,y,h,hp,maxhp,dt)
+local C=A.HC
+local ratio=math.clamp(hp/math.max(maxhp,1),0,1)
+e.smooth=e.smooth+(ratio-e.smooth)*math.min(1,dt*C.speed)
+
+local width=C.width
+local bx=x-C.gap-width
+local fillHeight=math.floor(h*e.smooth+.5)
+
+rect(e.holder,bx,y,width,h)
+e.holder.Visible=true
+
+rect(e.back,0,0,width,h)
+e.outline.Enabled=C.outline
+
+rect(e.clip,0,h-fillHeight,width,fillHeight)
+rect(e.fill,0,-(h-fillHeight),width,h)
+
+e.glow.Visible=C.glow
+e.glow.ImageTransparency=.72
+rect(e.glow,-8,-8,width+16,h+16)
+
+e.text.Visible=C.number
+e.text.Text=tostring(math.floor(hp+.5))
+rect(e.text,-30,-17,64,16)
+end
+
+local function getTeam(obj)
+if not obj then return nil end
+local t=obj:GetAttribute("Team")
+if t~=nil then return tostring(t)end
+if obj:IsA("Player") and obj.Team then return obj.Team.Name end
+return nil
+end
+
+local function myTeam()
+return getTeam(LP) or getTeam(LP.Character)
+end
+
+local function owner(c)
+return P:GetPlayerFromCharacter(c) or P:FindFirstChild(c.Name)
+end
+
+local function enemy(c,mine)
+if c==LP.Character or c.Name==LP.Name then return false end
+local pl=owner(c)
+if pl==LP then return false end
+local ct=getTeam(c) or getTeam(pl)
+if mine and ct then return mine~=ct end
+if pl and pl~=LP then return true end
+if c:GetAttribute("Bot")==true then return true end
+return true
+end
+
+local function health(c)
+if c:GetAttribute("Dead")==true then return 0,100 end
+local hum=c:FindFirstChildOfClass("Humanoid")
+local hp=c:GetAttribute("Health")
+local maxhp=c:GetAttribute("MaxHealth")
+if typeof(hp)~="number" then hp=hum and hum.Health or 100 end
+if typeof(maxhp)~="number" then maxhp=hum and hum.MaxHealth or 100 end
+return hp,math.max(maxhp,1)
+end
+
+local function root(c)
+return c:FindFirstChild("HumanoidRootPart")
+or c:FindFirstChild("UpperTorso")
+or c:FindFirstChild("Torso")
+or c:FindFirstChild("LowerTorso")
+or c:FindFirstChild("Head")
+or c.PrimaryPart
+or c:FindFirstChildWhichIsA("BasePart",true)
+end
+
+local function bounds(c,r)
+local head=c:FindFirstChild("Head")
+local top,bottom
+
+if head and head:IsA("BasePart")then
+top=head.Position+Vector3.new(0,head.Size.Y*.8+.25,0)
+end
+
+local minY,maxY=math.huge,-math.huge
+local count=0
+
+for _,v in ipairs(c:GetDescendants())do
+if v:IsA("BasePart") and count<35 then
+count=count+1
+local y=v.Position.Y
+local half=v.Size.Y*.5
+minY=math.min(minY,y-half)
+maxY=math.max(maxY,y+half)
+end
+end
+
+if count==0 then return nil end
+if not top then top=Vector3.new(r.Position.X,maxY+.25,r.Position.Z)end
+bottom=Vector3.new(r.Position.X,minY-.15,r.Position.Z)
+
+if top.Y-bottom.Y<1 then
+top=r.Position+Vector3.new(0,2.8,0)
+bottom=r.Position-Vector3.new(0,2.8,0)
+end
+
+return top,bottom
+end
+
+local function collect()
+local result={}
+local folder=W:FindFirstChild("Characters")
+
+if folder then
+for _,c in ipairs(folder:GetChildren())do
+if c:IsA("Model")then result[c]=true end
+end
+end
+
+for _,pl in ipairs(P:GetPlayers())do
+if pl~=LP and pl.Character then result[pl.Character]=true end
+end
+
+return result
+end
+
+local function remove(map,c)
+local e=map[c]
+if e then
+e.holder:Destroy()
+map[c]=nil
+end
+end
+
+local function render(dt)
+if not A.Active then return end
+
+local C,H=A.C,A.HC
+if not C.enabled and not H.enabled then
+for c in pairs(A.Boxes)do remove(A.Boxes,c)end
+for c in pairs(A.Bars)do remove(A.Bars,c)end
+return
+end
+
+local cam=W.CurrentCamera
+if not cam then return end
+
+local seen={}
+local mine=myTeam()
+
+for c in pairs(collect())do
+local hp,maxhp=health(c)
+
+if c.Parent and hp>0 and enemy(c,mine)then
+local r=root(c)
+
+if r then
+local top,bottom=bounds(c,r)
+
+if top and bottom then
+local t=cam:WorldToViewportPoint(top)
+local b=cam:WorldToViewportPoint(bottom)
+
+if t.Z>0 and b.Z>0 then
+local h=math.abs(b.Y-t.Y)
+local w=h*.5
+local x=(t.X+b.X)*.5-w*.5
+local y=math.min(t.Y,b.Y)
+local size=cam.ViewportSize
+
+if h>=3 and x+w>=0 and x<=size.X and y+h>=0 and y<=size.Y then
+x=math.floor(x+.5)
+y=math.floor(y+.5)
+w=math.max(3,math.floor(w+.5))
+h=math.max(3,math.floor(h+.5))
+seen[c]=true
+
+if C.enabled then
+local e=A.Boxes[c]
+if not e then
+e=newBox()
+A.Boxes[c]=e
+end
+drawBox(e,x,y,w,h)
+end
+
+if H.enabled then
+local e=A.Bars[c]
+if not e then
+e=newBar()
+A.Bars[c]=e
+end
+drawBar(e,x,y,h,hp,maxhp,dt)
+end
+end
+end
+end
+end
+end
+end
+
+for c in pairs(A.Boxes)do
+if not seen[c] or not C.enabled then remove(A.Boxes,c)end
+end
+
+for c in pairs(A.Bars)do
+if not seen[c] or not H.enabled then remove(A.Bars,c)end
+end
+end
+
+local lastError=0
+A.Connections[#A.Connections+1]=R.RenderStepped:Connect(function(dt)
+local ok,err=pcall(render,dt)
+if not ok and os.clock()-lastError>3 then
+lastError=os.clock()
+warn("[AURORA ESP RENDER]",err)
+end
+end)
+
+function A:Stop()
+if not self.Active then return end
+self.Active=false
+for _,c in ipairs(self.Connections)do
+pcall(function()c:Disconnect()end)
+end
+for c in pairs(self.Boxes)do remove(self.Boxes,c)end
+for c in pairs(self.Bars)do remove(self.Bars,c)end
+if self.VisualGui then self.VisualGui:Destroy()end
+end
+
+local url="https://raw.githubusercontent.com/amazson/zaml/main/windui.lua"
+local src
+
+if readfile then
+for _,path in ipairs({"hub/windui.lua","windui.lua"})do
+local ok,data=pcall(readfile,path)
+if ok and type(data)=="string" and #data>100 then
+src=data
+break
+end
+end
+end
+
+if not src then
+src=game:HttpGet(url,true)
+if writefile then
+pcall(function()
+if makefolder and isfolder and not isfolder("hub")then makefolder("hub")end
+writefile("hub/windui.lua",src)
+end)
+end
+end
+
+local UI=assert(loadstring(src,"=windui"))()
+
+local function hex(s)return Color3.fromHex(s)end
+local function grad(a,b,rotation)
+return ColorSequence.new({
+ColorSequenceKeypoint.new(0,hex(a)),
+ColorSequenceKeypoint.new(1,hex(b))
+})
+end
+
+UI:AddTheme({
+Name="Aurora",
+Accent=grad("#1F0C19","#2A1024",90),
+Dialog=grad("#1F0C19","#2A1024",90),
+Background=grad("#1A0A14","#2B0D22",135),
+Text=hex("#FFEAF5"),
+Placeholder=hex("#C98BAE"),
+Icon=hex("#F9A8D4"),
+Button=grad("#F472B6","#DB2777",45),
+Toggle=grad("#F472B6","#DB2777",45),
+Checkbox=grad("#F472B6","#DB2777",45),
+Slider=hex("#F472B6"),
+Primary=hex("#F472B6"),
+ElementBackground=hex("#2A1222"),
+ElementBackgroundHover=hex("#3A1830"),
+WindowOutline=ColorSequence.new({
+ColorSequenceKeypoint.new(0,hex("#F9A8D4")),
+ColorSequenceKeypoint.new(.5,hex("#DB2777")),
+ColorSequenceKeypoint.new(1,hex("#F9A8D4"))
+})
+})
+
+local Window=UI:CreateWindow({
+Title="hub",
+Author="template",
+Folder="hub",
+Size=UDim2.fromOffset(760,500),
+MinSize=Vector2.new(480,320),
+ToggleKey=Enum.KeyCode.K,
+Theme="Aurora",
+Transparent=true,
+Acrylic=true,
+OutlineThickness=4,
+OutlineAnimated=true,
+OutlineSpeed=90,
+HideSearchBar=false,
+SideBarWidth=190
+})
+
+A.UI=UI
+A.Window=Window
+A.Ready=true
+
+pcall(function()
+Window:OnDestroy(function()
+A:Stop()
+end)
+end)
+
+print("[AURORA HUB] 1 часть загружена")
+local G=getgenv and getgenv() or _G
+local A=G.AuroraHubV4
+
+if not A or not A.Active or not A.Ready then
+warn("[AURORA HUB] Сначала запусти часть 1")
+return
+end
+
+if A.Part2Loaded then
+warn("[AURORA HUB] Часть 2 уже загружена")
+return
+end
+
+local Window=A.Window
+local C=A.C
+local H=A.HC
+local Registry=A.Registry
+
+local legit=Window:Tab({Title="legit",Icon="crosshair"})
+local rage=Window:Tab({Title="rage",Icon="zap"})
+local visuals=Window:Tab({Title="visuals",Icon="eye"})
+local movement=Window:Tab({Title="movement",Icon="footprints"})
+local misc=Window:Tab({Title="misc",Icon="settings"})
+local search=Window:Tab({Title="search",Icon="search"})
+
+local function register(name,obj,tab)
+Registry[#Registry+1]={name=name,obj=obj,tab=tab}
+return obj
+end
+
+local function toggle(tab,title,value,callback)
+local obj=tab:Toggle({
+Title=title,
+Value=value,
+Callback=callback
+})
+return register(title,obj,tab)
+end
+
+local function slider(tab,title,value,min,max,step,callback)
+local obj=tab:Slider({
+Title=title,
+Value={Min=min,Max=max,Default=value},
+Step=step,
+Callback=callback
+})
+return register(title,obj,tab)
+end
+
+local function dropdown(tab,title,values,value,callback)
+local obj=tab:Dropdown({
+Title=title,
+Values=values,
+Value=value,
+Callback=callback
+})
+return register(title,obj,tab)
+end
+
+legit:Section({Title="silent aim"})
+
+toggle(legit,"silent aim",false,function()end)
+slider(legit,"fov",100,0,500,1,function()end)
+
+rage:Section({Title="ragebot"})
+
+toggle(rage,"ragebot",false,function()end)
+dropdown(rage,"hitbox",{"head","torso","random"},"head",function()end)
+
+visuals:Section({Title="player esp"})
+
+toggle(visuals,"Enabled",C.enabled,function(v)
+C.enabled=v
+end)
+
+dropdown(visuals,"Box mode",{"corners","full"},C.mode,function(v)
+if type(v)=="table" then v=v[1]end
+if v=="corners" or v=="full" then C.mode=v end
+end)
+
+toggle(visuals,"Glow",C.glow,function(v)
+C.glow=v
+end)
+
+slider(visuals,"Glow transparency",C.glowTransparency,0,1,.01,function(v)
+C.glowTransparency=v
+end)
+
+toggle(visuals,"Filled",C.filled,function(v)
+C.filled=v
+end)
+
+slider(visuals,"Filled transparency",C.filledTransparency,0,1,.01,function(v)
+C.filledTransparency=v
+end)
+
+toggle(visuals,"Outline",C.outline,function(v)
+C.outline=v
+end)
+
+slider(visuals,"Outline transparency",C.outlineTransparency,0,1,.01,function(v)
+C.outlineTransparency=v
+end)
+
+visuals:Section({Title="Health bar esp"})
+
+toggle(visuals,"Enabled",H.enabled,function(v)
+H.enabled=v
+end)
+
+toggle(visuals,"Health number",H.number,function(v)
+H.number=v
+end)
+
+toggle(visuals,"Glow bar",H.glow,function(v)
+H.glow=v
+end)
+
+toggle(visuals,"Outline bar",H.outline,function(v)
+H.outline=v
+end)
+
+movement:Section({Title="movement"})
+
+toggle(movement,"auto bhop",false,function()end)
+
+misc:Section({Title="misc"})
+
+register("reload",misc:Button({
+Title="reload",
+Callback=function()end
+}),misc)
+
+search:Section({Title="Search settings"})
+
+local function selectResult(entry)
+pcall(function()
+Window:SelectTab(entry.tab)
+end)
+
+pcall(function()
+entry.tab:Select()
+end)
+
+pcall(function()
+if entry.obj.ScrollTo then entry.obj:ScrollTo()end
+end)
+end
+
+local query=""
+
+search:Input({
+Title="Search",
+Placeholder="Type setting name...",
+Callback=function(v)
+query=tostring(v or ""):lower()
+end
+})
+
+search:Button({
+Title="Find and open",
+Callback=function()
+if query=="" then return end
+for _,entry in ipairs(Registry)do
+if entry.name:lower():find(query,1,true)then
+selectResult(entry)
+return
+end
+end
+warn("[AURORA HUB] Настройка не найдена: "..query)
+end
+})
+
+A.Part2Loaded=true
+print("[AURORA HUB] 2 часть загружена")
